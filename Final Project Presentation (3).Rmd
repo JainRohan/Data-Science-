@@ -1,0 +1,397 @@
+---
+title: 'Final Project STA130'
+author: 'Martin Chak, Talal Fahoum, Rohan Jain, Jeff Li, TUT0204, 204P1'
+subtitle: Internet Usage
+output:
+  ioslides_presentation: default
+  widescreen: yes
+---
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(tidyverse)
+
+path <- "https://raw.githubusercontent.com/ntaback/UofT_STA130/master/Fall2018/Finalproject/" #Retrieving from project
+
+get_CIAWFB_data <- function(table_url)#Retrieving from CIA World Factbook
+{
+  library(rvest)
+  dat <- xml2::read_html(table_url) %>% rvest::html_table()
+  dat[[1]]
+}
+
+
+#Information for Question 3, Martin's Stuff
+democracy_wiki <- read_csv(paste0(path,"democracyindex2017.csv"))
+world_regions_wiki <- get_CIAWFB_data("https://meta.wikimedia.org/wiki/List_of_countries_by_regional_classification")
+internet_users_cia <- get_CIAWFB_data('https://www.cia.gov/library/publications/resources/the-world-factbook/rankorder/2153rank.html')
+life_expect_cia <- get_CIAWFB_data('https://www.cia.gov/library/publications/resources/the-world-factbook/rankorder/2102rank.html')
+health_expend_cia <- get_CIAWFB_data('https://www.cia.gov/library/publications/resources/the-world-factbook/rankorder/2225rank.html')
+gdp_cia <- get_CIAWFB_data('https://www.cia.gov/library/publications/resources/the-world-factbook/rankorder/2001rank.html')
+gdp_ppp_cia <- get_CIAWFB_data('https://www.cia.gov/library/publications/resources/the-world-factbook/rankorder/2004rank.html')
+population_cia <- get_CIAWFB_data('https://www.cia.gov/library/publications/resources/the-world-factbook/rankorder/2119rank.html')
+education_cia <- get_CIAWFB_data('https://www.cia.gov/library/publications/resources/the-world-factbook/rankorder/2206rank.html')
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+internet_users <- internet_users_cia %>%
+  mutate(Users = as.numeric(str_replace_all(`INTERNET USERS`, '[,]', '')))
+
+democracy <- democracy_wiki
+
+life_expect <- life_expect_cia %>%
+  rename('Years'= '(YEARS)')
+
+health_expend <- health_expend_cia
+
+gdp <- gdp_cia %>%
+  mutate(gdp_re = as.numeric(str_replace_all(`GDP (PURCHASING POWER PARITY)`, '[$,]', '')))
+
+gdp_ppp <- gdp_ppp_cia %>%
+  mutate(gdp_ppp_re = as.numeric(str_replace_all(`GDP - PER CAPITA (PPP)`, '[$,]', '')))
+
+population <- population_cia %>%
+  mutate(population_re = as.numeric(str_replace_all(POPULATION, '[,]', '')))
+
+education <- education_cia %>%
+  rename('%' = '(% OF GDP)')
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# This chunk of code is to create a dataset that has the proportion of users to the population of a country.
+# It will be used to merge with other datasets since we defined internet usage as a proportion of population
+
+population_user <- left_join(x = internet_users, y = population, by = 'Country') %>%
+  filter(is.na(Users) == FALSE & is.na(population_re) == FALSE) %>%
+  mutate(user_proportion = Users/population_re) %>%
+  select(Rank.x, Country, user_proportion)
+
+#population_user
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# This chunk of R code is for the linear regression of democracy and internet users. The comparison will be made
+# to see what percentage of the population has internet usage, this will involve population, internet_users and 
+# democracy
+
+democracy_joined <- left_join(x = population_user, y = democracy, by = 'Country') %>%
+  filter(is.na(user_proportion) == FALSE & is.na(Score) == FALSE) %>%
+  select(Rank.x, Country, Score, user_proportion)
+
+#democracy_joined
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# This chunk of R code is for the linear regression of life expectancy and internet users. The comparison will be made
+# to see what percentage of the population has internet usage, this will involve population_users and life_expect
+
+
+life_expect_joined <- left_join(x = population_user, y = life_expect, by = 'Country') %>%
+  filter(is.na(user_proportion) == FALSE & is.na(Years) == FALSE) %>%
+  select(Rank.x, Country, Years, user_proportion)
+
+#life_expect_joined
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# This chunk of R code is for the linear regression of health expenditures and internet users. The comparison will be
+# made to see what percentage of the population has internet usage, this will involve population_users, health_expend and gdp_ppp
+
+
+health_expend_joined <- left_join(x = population_user, y = health_expend_cia, by = 'Country') %>%
+  left_join(x = ., y = gdp_ppp, by = 'Country') %>%
+  mutate(`Money Spent on Health per Capita` = (`(% OF GDP)`/100)*gdp_ppp_re) %>%
+  filter(is.na(user_proportion) == FALSE & is.na(`(% OF GDP)`) == FALSE & is.na(gdp_ppp_re) == FALSE) %>%
+  rename(Rank = Rank.x, `User Proportion` = user_proportion) %>%
+  select(Rank, Country, `Money Spent on Health per Capita`, `User Proportion`)
+
+#health_expend_joined
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# This chunk of R code is for the linear regression of gdp and internet users. The comparison will be made
+# to see what percentage of the population has internet usage, this will involve population_users and gdp
+
+
+gdp_joined <- left_join(x = population_user, y = gdp, by = 'Country') %>%
+  filter(is.na(user_proportion) == FALSE & is.na(gdp_re) == FALSE) %>%
+  select(Rank.x, Country, gdp_re, user_proportion)
+
+#gdp_joined
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+# This chunk of R code is for the linear regression of gdp_ppp and internet users. The comparison will be made
+# to see what percentage of the population has internet usage, this will involve population_users and gdp_ppp
+
+
+gdp_ppp_joined <- left_join(x = population_user, y = gdp_ppp, by = 'Country') %>%
+  filter(is.na(user_proportion) == FALSE & is.na(gdp_ppp_re) == FALSE) %>%
+  select(Rank.x, Country, gdp_ppp_re, user_proportion)
+
+#gdp_ppp_joined
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+edu_ppp_joined <- left_join(x = population_user, y = education, by = 'Country') %>%
+  filter(is.na(user_proportion) == FALSE & is.na('%') == FALSE)
+
+edu_ppp_joined <- left_join(x = edu_ppp_joined, y = gdp_ppp, by = 'Country')%>%
+  mutate(`Money Spent on Education` = (`%`/100)*gdp_ppp_re) %>%
+  filter(is.na(gdp_ppp_re) == FALSE & is.na(`Money Spent on Education`) == FALSE) %>%
+  select(Rank.x, Country, `Money Spent on Education`, user_proportion)
+
+#edu_ppp_joined
+```
+
+## Introduction
+- The internet usage of a country could be a result of several things, including: Democracy, Economics growth, Health,and Education.
+- We hope to find out if internet usage can accurately predicted by these factors, and if they can predict it all the same.
+- There is conflict over whether the internet on the whole has benefited society more than it has done harm, and analysing the relationship between the internet and some of the factors that convey a country's state of well-being will be of paramount importance.
+
+
+
+## Objectives
+- How do we define internet usage?
+- Do different regions in fact have different levels of internet usage? How will we show this?
+- How can Democracy, Education, Economy, and Health predict internet usage? Are they enough and have we used the best measures for each respective factor?
+
+
+
+## How We Defined Categories
+
+**Internet Usage** - The proportion of the population that uses the internet
+
+**Democracy** - Countries are measured by their score in the 2017 Democracy Index compiled by the Economist Intelligence Unit from the United Kingdom
+
+**Health** - Measured by the life expectancy given in the CIA World Factbook
+
+**Economy** - Measured by the country's GDP per capita on a purchasing power parity (PPP)
+
+**Education** - Measured by the country's total expenditures spent on education based on a per capita GDP on a Purchasing Power Parity (PPP)
+
+
+## Why We Defined Categories
+
+**Internet Usage** - We found that it was inapproporiate to measure internet usage by the total users in a country, since if a country, like China, where 53% of the population uses the internet, would be classified as a larger internet user than a small country that may have 100% internet usage, like Pitcairn Islands
+
+**Democracy** - The democracy index is a better tell of democracy as it takes into aggregates the other variables in the dataset
+
+
+## Limitations and Margins of Error in Data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+over_proportion <- left_join(x = internet_users, y = population, by = 'Country') %>%
+  filter(is.na(Users) == FALSE & is.na(population_re) == FALSE) %>%
+  mutate(user_proportion = Users/population_re) %>%
+  filter(user_proportion > 1.0) %>%
+  select(Country, Users, population_re, user_proportion, `Date of Information.x`, `Date of Information.y`) %>%
+  rename(Population = population_re, `User/Popul.` = user_proportion, `User Date` = `Date of Information.x`, `Population Date` = `Date of Information.y`)
+
+over_proportion
+```
+We can see here that the dates for when the data was surveyed are different, which leads to improper proportioning, especially in places like the Gaza Strip where fighting is common and population changes often
+
+## Limitations and Margins of Error in Data
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+edu_na <- left_join(x = population_user, y = education, by = 'Country') %>%
+  filter(is.na(`%`) == TRUE) %>%
+  select(Rank.x, Country, user_proportion, '%') %>%
+  rename(`User/Popul.` = user_proportion, `Percentage of GDP Spent on Education` = `%`, Rank = Rank.x)
+
+glimpse(edu_na)
+```
+```{r}
+nrow(edu_na)
+```
+
+Sometimes data does not exist for certain countries, and in education we have to discard 54 countries which cannot be used for the regressions. The consequences are large when large countries such as China are missing data.
+
+
+## Datasets for Distribution of Internet Usage
+
+```{r, echo=TRUE, message=FALSE, warning=FALSE}
+regions_joined <- left_join(x = population_user, y = world_regions_wiki
+                            , by = 'Country') %>%
+  filter(is.na(user_proportion) == FALSE & is.na(Region) == FALSE) %>%
+  select(Rank.x,Country, user_proportion, Region) %>%
+  rename(Rank = Rank.x, `User Proportion` = user_proportion)
+
+glimpse(regions_joined)
+```
+
+## Datasets for Distribution of Internet Usage
+
+- So in this code and the data analyzed, we first imported and parsed 3 datasets such as the Internet Users, Population, and the World Regions.
+- Determining the % between internet users of that country / population of that corresponding country.
+- Joins the data of internet users and population.
+- Using the filter() function checks all missing values (is.na). Then by mutate() determines the percentage of internet users. select() forms into an observation table. 
+- A box plot is being used to represent the distribution of the data. On the x-axis the 6 world regions are presented and on the y-axis it is the percentage of internet users. 
+
+
+
+
+## Datasets for Linear Regression
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+all_data_join <- left_join(x = internet_users, y = population, by = 'Country') %>%
+  left_join(x = ., y = democracy, by = 'Country') %>%
+  left_join(x = ., y = life_expect, by = 'Country') %>%
+  left_join(x = ., y = gdp, by = 'Country') %>%
+  left_join(x = ., y = gdp_ppp, by = 'Country') %>%
+  left_join(x = ., y = education, by = 'Country') %>%
+  filter(is.na(Users) == FALSE & is.na(population_re) == FALSE & is.na(Score) == FALSE & is.na(Years) == FALSE & is.na(gdp_re) == FALSE & is.na(gdp_ppp_re) == FALSE  & is.na(`%`) == FALSE) %>%
+  mutate(Democracy_Index = as.numeric(Score)) %>%
+  select(Rank.x, Country, Users, population_re, Democracy_Index, Years, gdp_re, gdp_ppp_re, `%`) %>%
+  rename(Rank = Rank.x, Population = population_re, Life_Expectancy = Years, GDP_on_PPP = gdp_re, GDP_per_Capita_on_PPP = gdp_ppp_re, Percentage_of_GDP_spent_on_Education = `%`)
+
+
+glimpse(all_data_join)
+```
+
+
+## Distribution of Internet Usage By World Regions
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+regions_joined %>%
+  ggplot(aes(x = Region, y = `User Proportion`)) +
+  geom_boxplot()
+
+```
+
+## Distribution of Internet Usage By World Regions
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+group_regions <- group_by(regions_joined, Region)
+#group_regions
+
+table_regions <- summarise(group_regions, `Median Proportion` = median(`User Proportion`)*100, `Standard Deviation` = sd(`User Proportion`)*100, `Number of Countries` = n())
+table_regions
+
+```
+
+## Relationship Between Internet Usage and Democracy
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+mod_demo <- lm(user_proportion~as.numeric(Score), data = democracy_joined)
+
+mod_demo_summ <- summary(mod_demo)
+mod_demo_summ$r.squared
+
+democracy_joined %>%
+  ggplot(aes(x = as.numeric(Score), y = user_proportion)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = TRUE)
+```
+
+## Relationship Between Internet Usage and Life Expectancy
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+mod_life <- lm(user_proportion~Years, data = life_expect_joined)
+
+mod_life_summ <- summary(mod_life)
+mod_life_summ$r.squared
+
+life_expect_joined %>%
+  ggplot(aes(x = Years, y = user_proportion)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = TRUE)
+```
+
+## Why Not Pick Health Expenditures
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+mod_health <- lm(`User Proportion`~`Money Spent on Health per Capita`, data = health_expend_joined)
+
+mod_health_summ <- summary(mod_health)
+mod_health_summ$r.squared
+
+health_expend_joined %>%
+  ggplot(aes(x = `Money Spent on Health per Capita`, y = `User Proportion`)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = TRUE)
+```
+
+## Why Not Pick Health Expenditures
+- Life expectancy is globally recognized and is a component of the HDI index which tracks economic and human development in countries.
+- We can establish that life expectancy can give insight on quality of life in many cases, and is a better indicator for health, rather than how much spent on health
+- This is seen with the U.S: the U.S has a higher health expenditure per capita than most countries but has a relatively low life expectancy when compared to other developed countries.
+- Although health expenditure could predict health as a whole, we do see exceptions such as the U.S - it is safer and more common to use life expectancy.
+
+
+## Relationship Between Internet Usage and GDP per Capita on PPP
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+mod_gdp_ppp <- lm(user_proportion~gdp_ppp_re, data = gdp_ppp_joined)
+
+mod_gdp_ppp_summ <- summary(mod_gdp_ppp)
+mod_gdp_ppp_summ$r.squared
+
+gdp_ppp_joined %>%
+  ggplot(aes(x = gdp_ppp_re, y = user_proportion)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = TRUE)
+```
+
+## Why Not Pick GDP on PPP
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+mod_gdp <- lm(user_proportion~gdp_re, data = gdp_joined)
+
+mod_gdp_summ <- summary(mod_gdp)
+mod_gdp_summ$r.squared
+
+gdp_joined %>%
+  ggplot(aes(x = gdp_re, y = user_proportion)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = TRUE)
+```
+
+## Why Not Pick GDP on PPP
+- We used GDP per capita instead of total GDP because we need to compare a countries GDP relative to its size - which is represented by population.
+- GDP per capita struggles to capture income inequality in some countries, and if the reality is that most of a countries wealth fall in the top 1% bracket, then not many people are likely to use the internet in that country, however this is a better alternative than GDP as variance is greater
+- It is also important to note that the GDP used in the data is on a purchasing power parity which compares the price of a good in a country to other countries in order to gauge the GDP with inflation in mind
+
+
+## Relationship Between Internet Usage and Education Expenditures per Capita
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+mod_edu_ppp <- lm(user_proportion~`Money Spent on Education`, data = edu_ppp_joined)
+
+mod_edu_ppp_summ <- summary(mod_edu_ppp)
+mod_edu_ppp_summ$r.squared
+
+edu_ppp_joined %>%
+  ggplot(aes(x = `Money Spent on Education`, y = user_proportion)) +
+  geom_point() +
+  geom_smooth(method = 'lm', se = TRUE)
+```
+
+## Which Indicator Best Predicts Internet Usage
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(rpart)
+library(partykit)
+
+tree_data <- left_join(x = population_user, y = all_data_join, by = 'Country') 
+
+set.seed(1)
+
+n <- nrow(tree_data)
+
+test_idx <- sample.int(n, size = round(0.2*n))
+
+train <- tree_data
+
+nrow(train)
+
+rtree_fit <- rpart(user_proportion ~ Life_Expectancy + GDP_on_PPP + GDP_per_Capita_on_PPP + Percentage_of_GDP_spent_on_Education, train)
+plot(as.party(rtree_fit), type="simple",gp=gpar(cex=1.0))
+```
+
+## Conclusions
+- Going back to our initial objectives we have a few conclusions to make
+- Firstly, from out boxplots we can see that internet usage differs from different regions, the difference is especially notable when we compare North America to countries in other world regions
+- Secondly, in our linear regressions and classification tree we found that health based on life expectancy and GDP per capita on a PPP is the best indicator of a potential country's internet usage
+- Thus we find that high internet usage countries are often better in terms of economy, health, education, and sometimes democracy
+
+
+
+## Acknowledgements
+- https://meta.wikimedia.org/wiki/List_of_countries_by_regional_classification
+- https://en.wikipedia.org/wiki/Democracy_Index (Study originally published by the Economist Intelligence Unit in the UK)
+- https://www.ineteconomics.org/perspectives/blog/the-link-between-health-spending-and-life-expectancy-the-us-is-an-outlier
+- https://economictimes.indiatimes.com/definition/human-development-index
+- http://www.globalpolitics.cz/clanky/human-development-index-how-to-cope-with-its-limitations
+- Thanks to our great TA Kaixuan Hu (Bryan)
