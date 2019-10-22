@@ -1,6 +1,4 @@
----
-title: 'Final Project STA130'
-author: ' Rohan Jain, Martin Chak, Talal Fahoum,Jeff Li
+
 subtitle: Internet Usage
 output:
   ioslides_presentation: default
@@ -394,4 +392,3 @@ plot(as.party(rtree_fit), type="simple",gp=gpar(cex=1.0))
 - https://www.ineteconomics.org/perspectives/blog/the-link-between-health-spending-and-life-expectancy-the-us-is-an-outlier
 - https://economictimes.indiatimes.com/definition/human-development-index
 - http://www.globalpolitics.cz/clanky/human-development-index-how-to-cope-with-its-limitations
-- Thanks to our great TA Kaixuan Hu (Bryan)
